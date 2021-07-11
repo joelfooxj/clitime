@@ -2,6 +2,6 @@ CC=gcc
 CFLAGS = -largp
 # DEPS = 
 
-timer: timer.c
-	$(CC) -o timer $(CFLAGS) timer.c 
+clitime: clitime.c
+	$(CC) -o clitime $(CFLAGS) clitime.c 
 	
