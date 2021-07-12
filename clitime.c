@@ -4,16 +4,13 @@
 #include<argp.h>
 #include<time.h>
 #include<string.h>
-// Just prints output for now 
-// TODO: Add ability to pause (p) 
-// TODO: Add reset (r)
-// TODO: Add continue (c) 
-// TODO: Add exit (e)
-// Either write a global interrupt handler, or a time-limited input prompt...
-// global handler seems to complicated... 
-// for now, just a simple scan..... 
-// wait for user input for 1 sec, check if stdin has anything in the buffer 
-// use poll to check for any input in stdin. 
+#include<poll.h>
+
+// TODO: Improve the response time of commands
+// TODO: Use enter as a start/stop toggle? 
+// TODO: Improve time parser for out-of-order components
+
+
 
 const char* ARGP_PROGRAM_VERSION = 
 	"timer-cli 1.0"; 
@@ -36,26 +33,133 @@ Eg. 2m30s=2minutes 30seconds, 1h20m=1hour 20minutes, 10s=10seconds."},
 
 };
 
+const char* commands_desc = "Start/Stop(s), Reset(r), Exit(e)\n";
+
+int command_parser(char* command){
+	// Accepts the following chars: p,r,c,e
+	if (strlen(command) > 1){
+		printf("%s is invalid.\n", command);
+		return -1;
+	}
+
+	char com = command[0];
+	switch(com){ 
+		case 's': 
+			// start/stop
+			return 1; 
+			break; 
+		case 'e': 
+			// exit
+			return 2; 
+			break; 
+		case 'r': 
+			// reset 
+			return 3; 
+			break;
+		default: 
+			printf("%s is invalid.\n", command);
+			return -1;
+			break;
+	}
+
+	return -1;
+}
+
+int poll_sec(char* command){
+	struct pollfd fds[1]; 
+	int timeout = 0; 
+	fds[0].fd = STDIN_FILENO; 
+	fds[0].events = 0; 
+	fds[0].events = fds[0].events | POLLIN;
+	
+	int result = poll(fds, 1, timeout);
+	if (result == 1){ 
+		// extract command from stdin 
+		// fgets(command, 1, stdin);
+		scanf("%1s", command);
+		fflush(stdin);
+		return 1;
+	} else return 0; 
+
+	// should not get here.
+	return -1;
+}
+
+
 int timer(int seconds){
+	int original_seconds = seconds;
+	int runningFlag = 1;
 	while(1){
+		// poll for 1 second here 
 		sleep(1);
-		if (seconds > 0){
-			seconds--; 
-		}
+		char commandStr[10];
+		int response = poll_sec(commandStr);
+		if (response == 1){
+			int command = command_parser(commandStr);
+			switch(command){
+				case 1: 
+					// toggle runningFlag
+					runningFlag = (runningFlag+1) % 2;
+					break;
+				case 2: 
+					exit(0);
+				case 3: 
+					seconds = original_seconds;
+					break; 
+				default: 
+					// Invalid commands are ignored.
+					break;
+			}	
+		}		
+
 		printf("\033c");
 		printf("%dhr %dmin %dsec\n", seconds/3600, (seconds/60)%60, seconds%60); 
+		printf("%s",commands_desc); 
+		if (seconds > 0 && runningFlag == 1){
+			seconds--;
+			printf("Running.\n");  
+		} else { 
+			printf("Stopped.\n");
+		}
+			
 	}
 	return 1; 
 }
 
 int stopwatch(){
-	int total_seconds = 0;
-	
+	int seconds = 0;
+	int runningFlag = 1; 	
 	while (1){
+	    // poll for 1 second here 
 		sleep(1);
-		total_seconds++; 
+		char commandStr[100];
+		int response = poll_sec(commandStr);
+		if (response == 1){
+			int command = command_parser(commandStr);
+			switch(command){
+				case 1: 
+					runningFlag = (runningFlag+1) % 2;
+					break;
+				case 2: 
+					exit(0);
+				case 3: 
+					seconds = 0;
+					break; 
+				default: 
+					// Invalid commands are ignored.
+					break;
+			}	
+		}		
+
 		printf("\033c");
-		printf("%dhr %dmin %dsec\n", total_seconds/3600, (total_seconds/60)%60, total_seconds%60); 
+		printf("%dhr %dmin %dsec\n", seconds/3600, (seconds/60)%60, seconds%60); 
+		printf("%s",commands_desc); 
+		if (runningFlag == 1){
+			seconds++; 
+			printf("Running.\n");
+		} else { 
+			printf("Stopped.\n");
+		}
 	}	 
 	return 1;
 }
@@ -93,9 +197,7 @@ parse_opt (int key, char *arg, struct argp_state *state)
       break;
     case 't':
       printf("timer started...\n");
-	  // for now just convert arg into seconds 
 	  int seconds =	parse_time(arg); 
-	  // int seconds = atoi(arg); 
 	  timer(seconds);
       break;
     }
