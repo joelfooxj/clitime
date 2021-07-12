@@ -10,6 +10,10 @@
 // TODO: Add continue (c) 
 // TODO: Add exit (e)
 // Either write a global interrupt handler, or a time-limited input prompt...
+// global handler seems to complicated... 
+// for now, just a simple scan..... 
+// wait for user input for 1 sec, check if stdin has anything in the buffer 
+// use poll to check for any input in stdin. 
 
 const char* ARGP_PROGRAM_VERSION = 
 	"timer-cli 1.0"; 
@@ -23,10 +27,11 @@ static char doc[] =
 static char args_doc[] = "stopwatch timer"; 
 
 static struct argp_option options[] = {
-	{"stopwatch", 's', 0, 0, "Start a stopwatch."},	
-	{"timer", 't', "SECONDS", 0, 
-		"Start a timer. Pass in a time of the following format: XhYmZs,\
-where X is the number of hours, Y is the number of minutes, and Z is the number of seconds."}, 
+	{"stopwatch", 's', 0, 0, "Starts a stopwatch."},	
+	{"timer", 't', "XhYmZs", 0, 
+		"Starts a timer. Time components (Xh, Ym, Zs) can be of any combination,  \
+but must be in order. \
+Eg. 2m30s=2minutes 30seconds, 1h20m=1hour 20minutes, 10s=10seconds."}, 
 	{0},	
 
 };
@@ -76,9 +81,6 @@ int parse_time(char* arg){
 	free(string_check);
 	return (nums[0]*3600)+(nums[1]*60)+(nums[2]);
 }
-
-
-
 
 static error_t
 parse_opt (int key, char *arg, struct argp_state *state)
