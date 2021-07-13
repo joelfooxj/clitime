@@ -7,9 +7,7 @@
 #include<poll.h>
 
 // TODO: Improve the response time of commands
-// TODO: Use enter as a start/stop toggle? 
 // TODO: Improve time parser for out-of-order components
-
 
 
 const char* ARGP_PROGRAM_VERSION = 
@@ -33,7 +31,7 @@ Eg. 2m30s=2minutes 30seconds, 1h20m=1hour 20minutes, 10s=10seconds."},
 
 };
 
-const char* commands_desc = "Start/Stop(s), Reset(r), Exit(e)\n";
+const char* commands_desc = "Start/Stop(Enter), Reset(r), Exit(e)\n";
 
 int command_parser(char* command){
 	// Accepts the following chars: p,r,c,e
@@ -44,7 +42,7 @@ int command_parser(char* command){
 
 	char com = command[0];
 	switch(com){ 
-		case 's': 
+		case '\n': 
 			// start/stop
 			return 1; 
 			break; 
@@ -76,8 +74,11 @@ int poll_sec(char* command){
 	if (result == 1){ 
 		// extract command from stdin 
 		// fgets(command, 1, stdin);
-		scanf("%1s", command);
-		fflush(stdin);
+		// scanf("%1s", command);
+		read(STDIN_FILENO, command, 1);
+		command[1] = '\0';
+		// fflush(stdin);
+		while(getchar() != '\n');
 		return 1;
 	} else return 0; 
 
@@ -93,6 +94,7 @@ int timer(int seconds){
 		// poll for 1 second here 
 		sleep(1);
 		char commandStr[10];
+		memset(commandStr, 0, strlen(commandStr));
 		int response = poll_sec(commandStr);
 		if (response == 1){
 			int command = command_parser(commandStr);
@@ -121,6 +123,8 @@ int timer(int seconds){
 		} else { 
 			printf("Stopped.\n");
 		}
+		// try peeking input 
+		
 			
 	}
 	return 1; 
