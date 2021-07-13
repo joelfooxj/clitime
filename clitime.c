@@ -8,7 +8,9 @@
 
 // TODO: Improve the response time of commands
 // TODO: Improve time parser for out-of-order components
-
+// TODO: Should probably assign timer/UI to a separate thread.
+// TODO: Peek stdin and display
+// TODO: Undefined behaviour with Enter toggling
 
 const char* ARGP_PROGRAM_VERSION = 
 	"timer-cli 1.0"; 
@@ -31,7 +33,7 @@ Eg. 2m30s=2minutes 30seconds, 1h20m=1hour 20minutes, 10s=10seconds."},
 
 };
 
-const char* commands_desc = "Start/Stop(Enter), Reset(r), Exit(e)\n";
+const char* commands_desc = "Start/Stop(s), Reset(r), Exit(e)\n";
 
 int command_parser(char* command){
 	// Accepts the following chars: p,r,c,e
@@ -42,7 +44,7 @@ int command_parser(char* command){
 
 	char com = command[0];
 	switch(com){ 
-		case '\n': 
+		case 's': 
 			// start/stop
 			return 1; 
 			break; 
@@ -77,8 +79,8 @@ int poll_sec(char* command){
 		// scanf("%1s", command);
 		read(STDIN_FILENO, command, 1);
 		command[1] = '\0';
-		// fflush(stdin);
-		while(getchar() != '\n');
+		fflush(stdin);
+		// while(getchar() != '\n');
 		return 1;
 	} else return 0; 
 
@@ -88,11 +90,12 @@ int poll_sec(char* command){
 
 
 int timer(int seconds){
-	int original_seconds = seconds;
+	int original_mseconds = 1000*seconds;
+	int mseconds = 1000*seconds;
 	int runningFlag = 1;
 	while(1){
 		// poll for 1 second here 
-		sleep(1);
+		usleep(1e3);
 		char commandStr[10];
 		memset(commandStr, 0, strlen(commandStr));
 		int response = poll_sec(commandStr);
@@ -106,7 +109,7 @@ int timer(int seconds){
 				case 2: 
 					exit(0);
 				case 3: 
-					seconds = original_seconds;
+					mseconds = original_mseconds;
 					break; 
 				default: 
 					// Invalid commands are ignored.
@@ -115,27 +118,27 @@ int timer(int seconds){
 		}		
 
 		printf("\033c");
-		printf("%dhr %dmin %dsec\n", seconds/3600, (seconds/60)%60, seconds%60); 
+		printf("%dhr %dmin %dsec\n", (mseconds/1000)/3600, (mseconds/60000)%60, (mseconds/1000)%60); 
 		printf("%s",commands_desc); 
 		if (seconds > 0 && runningFlag == 1){
-			seconds--;
+			mseconds--;
 			printf("Running.\n");  
 		} else { 
 			printf("Stopped.\n");
 		}
 		// try peeking input 
-		
+			
 			
 	}
 	return 1; 
 }
 
 int stopwatch(){
-	int seconds = 0;
+	int mseconds = 0;
 	int runningFlag = 1; 	
 	while (1){
 	    // poll for 1 second here 
-		sleep(1);
+		usleep(1e3);
 		char commandStr[100];
 		int response = poll_sec(commandStr);
 		if (response == 1){
@@ -147,7 +150,7 @@ int stopwatch(){
 				case 2: 
 					exit(0);
 				case 3: 
-					seconds = 0;
+					mseconds = 0;
 					break; 
 				default: 
 					// Invalid commands are ignored.
@@ -156,14 +159,16 @@ int stopwatch(){
 		}		
 
 		printf("\033c");
-		printf("%dhr %dmin %dsec\n", seconds/3600, (seconds/60)%60, seconds%60); 
+		printf("%dhr %dmin %dsec\n", (mseconds/1000)/3600, (mseconds/60000)%60, (mseconds/1000)%60); 
 		printf("%s",commands_desc); 
 		if (runningFlag == 1){
-			seconds++; 
+			mseconds++; 
 			printf("Running.\n");
 		} else { 
 			printf("Stopped.\n");
 		}
+		// try peeking stdin 
+		
 	}	 
 	return 1;
 }
