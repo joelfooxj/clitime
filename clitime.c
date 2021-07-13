@@ -6,7 +6,6 @@
 #include<string.h>
 #include<poll.h>
 
-// TODO: Improve the response time of commands
 // TODO: Improve time parser for out-of-order components
 // TODO: Should probably assign timer/UI to a separate thread.
 // TODO: Peek stdin and display
@@ -118,7 +117,11 @@ int timer(int seconds){
 		}		
 
 		printf("\033c");
-		printf("%dhr %dmin %dsec\n", (mseconds/1000)/3600, (mseconds/60000)%60, (mseconds/1000)%60); 
+		printf("%dhr %dmin %dsec, %dmsec\n", 
+			(mseconds/1000)/3600, 
+			(mseconds/60000)%60, 
+			(mseconds/1000)%60, 
+			mseconds%1000); 
 		printf("%s",commands_desc); 
 		if (seconds > 0 && runningFlag == 1){
 			mseconds--;
@@ -159,7 +162,11 @@ int stopwatch(){
 		}		
 
 		printf("\033c");
-		printf("%dhr %dmin %dsec\n", (mseconds/1000)/3600, (mseconds/60000)%60, (mseconds/1000)%60); 
+		printf("%dhr %dmin %dsec, %dmsec\n", 
+			(mseconds/1000)/3600, 
+			(mseconds/60000)%60, 
+			(mseconds/1000)%60, 
+			mseconds%1000); 
 		printf("%s",commands_desc); 
 		if (runningFlag == 1){
 			mseconds++; 
