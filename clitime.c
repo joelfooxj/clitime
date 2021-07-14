@@ -11,8 +11,6 @@
 
 // TODO: Improve time parser for out-of-order components
 // TODO: Should probably assign timer/UI to a separate thread.
-// TODO: Peek stdin and display
-// TODO: Undefined behaviour with Enter toggling
 
 int kbhit(void) {
     static bool initflag = false;
@@ -65,7 +63,7 @@ int timer(int seconds){
 		if (kbhit()){
 			commandStr = getchar();
 			switch(commandStr){
-				case 's': 
+				case '\n': 
 					// toggle runningFlag
 					runningFlag = (runningFlag+1) % 2;
 					break;
@@ -107,7 +105,7 @@ int stopwatch(){
 		if (kbhit()){
 			commandStr = getchar();
 			switch(commandStr){
-				case 's': 
+				case '\n': 
 					runningFlag = (runningFlag+1) % 2;
 					break;
 				case 'e': 
