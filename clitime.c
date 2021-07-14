@@ -4,13 +4,34 @@
 #include<argp.h>
 #include<time.h>
 #include<string.h>
-#include<poll.h>
+#include<termios.h>
+#include<sys/ioctl.h>
+#include<stdbool.h>
+
 
 // TODO: Improve time parser for out-of-order components
 // TODO: Should probably assign timer/UI to a separate thread.
 // TODO: Peek stdin and display
 // TODO: Undefined behaviour with Enter toggling
 
+int kbhit(void) {
+    static bool initflag = false;
+    static const int STDIN = 0;
+
+    if (!initflag) {
+        // Use termios to turn off line buffering
+        struct termios term;
+        tcgetattr(STDIN, &term);
+        term.c_lflag &= ~ICANON;
+        tcsetattr(STDIN, TCSANOW, &term);
+        setbuf(stdin, NULL);
+        initflag = true;
+    }
+
+    int nbbytes;
+    ioctl(STDIN, FIONREAD, &nbbytes);  // 0 is STDIN
+    return nbbytes;
+}
 const char* ARGP_PROGRAM_VERSION = 
 	"timer-cli 1.0"; 
 
@@ -34,80 +55,23 @@ Eg. 2m30s=2minutes 30seconds, 1h20m=1hour 20minutes, 10s=10seconds."},
 
 const char* commands_desc = "Start/Stop(s), Reset(r), Exit(e)\n";
 
-int command_parser(char* command){
-	// Accepts the following chars: p,r,c,e
-	if (strlen(command) > 1){
-		printf("%s is invalid.\n", command);
-		return -1;
-	}
-
-	char com = command[0];
-	switch(com){ 
-		case 's': 
-			// start/stop
-			return 1; 
-			break; 
-		case 'e': 
-			// exit
-			return 2; 
-			break; 
-		case 'r': 
-			// reset 
-			return 3; 
-			break;
-		default: 
-			printf("%s is invalid.\n", command);
-			return -1;
-			break;
-	}
-
-	return -1;
-}
-
-int poll_sec(char* command){
-	struct pollfd fds[1]; 
-	int timeout = 0; 
-	fds[0].fd = STDIN_FILENO; 
-	fds[0].events = 0; 
-	fds[0].events = fds[0].events | POLLIN;
-	
-	int result = poll(fds, 1, timeout);
-	if (result == 1){ 
-		// extract command from stdin 
-		// fgets(command, 1, stdin);
-		// scanf("%1s", command);
-		read(STDIN_FILENO, command, 1);
-		command[1] = '\0';
-		fflush(stdin);
-		// while(getchar() != '\n');
-		return 1;
-	} else return 0; 
-
-	// should not get here.
-	return -1;
-}
-
-
 int timer(int seconds){
 	int original_mseconds = 1000*seconds;
 	int mseconds = 1000*seconds;
 	int runningFlag = 1;
 	while(1){
-		// poll for 1 second here 
 		usleep(1e3);
-		char commandStr[10];
-		memset(commandStr, 0, strlen(commandStr));
-		int response = poll_sec(commandStr);
-		if (response == 1){
-			int command = command_parser(commandStr);
-			switch(command){
-				case 1: 
+		char commandStr;
+		if (kbhit()){
+			commandStr = getchar();
+			switch(commandStr){
+				case 's': 
 					// toggle runningFlag
 					runningFlag = (runningFlag+1) % 2;
 					break;
-				case 2: 
+				case 'e': 
 					exit(0);
-				case 3: 
+				case 'r': 
 					mseconds = original_mseconds;
 					break; 
 				default: 
@@ -129,9 +93,6 @@ int timer(int seconds){
 		} else { 
 			printf("Stopped.\n");
 		}
-		// try peeking input 
-			
-			
 	}
 	return 1; 
 }
@@ -140,19 +101,18 @@ int stopwatch(){
 	int mseconds = 0;
 	int runningFlag = 1; 	
 	while (1){
-	    // poll for 1 second here 
+		// poll every 1msec
 		usleep(1e3);
-		char commandStr[100];
-		int response = poll_sec(commandStr);
-		if (response == 1){
-			int command = command_parser(commandStr);
-			switch(command){
-				case 1: 
+		char commandStr; 
+		if (kbhit()){
+			commandStr = getchar();
+			switch(commandStr){
+				case 's': 
 					runningFlag = (runningFlag+1) % 2;
 					break;
-				case 2: 
+				case 'e': 
 					exit(0);
-				case 3: 
+				case 'r': 
 					mseconds = 0;
 					break; 
 				default: 
@@ -160,7 +120,7 @@ int stopwatch(){
 					break;
 			}	
 		}		
-
+		
 		printf("\033c");
 		printf("%dhr %dmin %dsec, %dmsec\n", 
 			(mseconds/1000)/3600, 
@@ -174,8 +134,6 @@ int stopwatch(){
 		} else { 
 			printf("Stopped.\n");
 		}
-		// try peeking stdin 
-		
 	}	 
 	return 1;
 }
