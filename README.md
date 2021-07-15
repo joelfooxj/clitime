@@ -1,9 +1,9 @@
-# timer-cli
-A simple CLI timer/stopwatch.
+# clitime
+A simple CLI timer/stopwatch for Unix-based systems. (Windows support in the future...)
 
 ## Installation instructions 
 1. Clone repository 
-2. Enter directory and `make` (for Unix-based systems). 
+2. Enter repo directory and `make` (for Unix-based systems). 
 
 ## Usage 
 1. Run with either the `--stopwatch` or `--timer` options. 
