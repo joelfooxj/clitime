@@ -146,7 +146,13 @@ int parse_time(char* arg){
 	for(int i = 0; i < 3; i++){ 
 		char* pos = strchr(string_check, chunks[i]); 
 		if (pos != NULL){
-			nums[i] = atoi(strtok(foundTokens <= 0 ? arg:NULL, "hms")); 
+			int time_num = atoi(strtok(foundTokens <= 0 ? arg:NULL, "hms")); 
+			if (time_num < 0){
+				printf("Invalid time value for %c\n", chunks[i]);
+				exit(1);
+			} else { 
+				nums[i] = time_num;
+			}
 			foundTokens++;
 		}
 	}	
