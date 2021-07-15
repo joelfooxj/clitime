@@ -136,7 +136,8 @@ int parse_time(char* arg){
 	// Any combination of Xh, Ym, Zs, in that order
 	
 
-	char* string_check = (char*)malloc(strlen(arg)+1);
+	// char* string_check = (char*)malloc(strlen(arg)+1);
+	char string_check[strlen(arg)+1];
 	strncpy(string_check,arg, strlen(arg)+1);
 
 	const char chunks[] = {'h','m','s'};
@@ -156,7 +157,6 @@ int parse_time(char* arg){
 			foundTokens++;
 		}
 	}	
-	free(string_check);
 	return (nums[0]*3600)+(nums[1]*60)+(nums[2]);
 }
 
