@@ -10,7 +10,11 @@
 
 
 // TODO: Improve time parser for out-of-order components
+// TODO: Improve error checking for time parser
 // TODO: Should probably assign timer/UI to a separate thread.
+// -> Put the time functions running on another thread. I can't use sleep to increment the mseconds... 
+// timer thread could use poll... but I'd have to setup some kinda of shared buffer as a fd for it poll... 
+// timer thread could use a mutex timeout thingy
 
 int kbhit(void) {
     static bool initflag = false;
@@ -51,7 +55,22 @@ Eg. 2m30s=2minutes 30seconds, 1h20m=1hour 20minutes, 10s=10seconds."},
 
 };
 
-const char* commands_desc = "Start/Stop(s), Reset(r), Exit(e)\n";
+const char* commands_desc = "Start/Stop(space), Reset(r), Exit(e)\n";
+
+void time_printout(int mseconds, int status){ 
+	printf("\033c");
+	printf("%dhr %dmin %dsec %dmsec\n", 
+		(mseconds/1000)/3600, 
+		(mseconds/60000)%60, 
+		(mseconds/1000)%60, 
+		mseconds%1000); 
+	printf("%s",commands_desc); 
+	if (status == 1){
+		printf("Running.\n");  
+	} else { 
+		printf("Stopped.\n");
+	}
+}
 
 int timer(int seconds){
 	int original_mseconds = 1000*seconds;
@@ -63,7 +82,7 @@ int timer(int seconds){
 		if (kbhit()){
 			commandStr = getchar();
 			switch(commandStr){
-				case '\n': 
+				case ' ': 
 					// toggle runningFlag
 					runningFlag = (runningFlag+1) % 2;
 					break;
@@ -77,20 +96,8 @@ int timer(int seconds){
 					break;
 			}	
 		}		
-
-		printf("\033c");
-		printf("%dhr %dmin %dsec, %dmsec\n", 
-			(mseconds/1000)/3600, 
-			(mseconds/60000)%60, 
-			(mseconds/1000)%60, 
-			mseconds%1000); 
-		printf("%s",commands_desc); 
-		if (seconds > 0 && runningFlag == 1){
-			mseconds--;
-			printf("Running.\n");  
-		} else { 
-			printf("Stopped.\n");
-		}
+		time_printout(mseconds, runningFlag);
+		if (mseconds > 0 && runningFlag == 1) mseconds--;
 	}
 	return 1; 
 }
@@ -105,7 +112,7 @@ int stopwatch(){
 		if (kbhit()){
 			commandStr = getchar();
 			switch(commandStr){
-				case '\n': 
+				case ' ': 
 					runningFlag = (runningFlag+1) % 2;
 					break;
 				case 'e': 
@@ -118,20 +125,8 @@ int stopwatch(){
 					break;
 			}	
 		}		
-		
-		printf("\033c");
-		printf("%dhr %dmin %dsec, %dmsec\n", 
-			(mseconds/1000)/3600, 
-			(mseconds/60000)%60, 
-			(mseconds/1000)%60, 
-			mseconds%1000); 
-		printf("%s",commands_desc); 
-		if (runningFlag == 1){
-			mseconds++; 
-			printf("Running.\n");
-		} else { 
-			printf("Stopped.\n");
-		}
+		time_printout(mseconds, runningFlag);
+		if (runningFlag == 1) mseconds++;
 	}	 
 	return 1;
 }
@@ -139,6 +134,7 @@ int stopwatch(){
 int parse_time(char* arg){
 	// string should be in format XhYmZs
 	// Any combination of Xh, Ym, Zs, in that order
+	
 
 	char* string_check = (char*)malloc(strlen(arg)+1);
 	strncpy(string_check,arg, strlen(arg)+1);
