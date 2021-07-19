@@ -11,10 +11,20 @@
 
 // TODO: Improve time parser for out-of-order components
 // TODO: Improve error checking for time parser
+// TODO: Improve arg parser error checking
 // TODO: Should probably assign timer/UI to a separate thread.
 // -> Put the time functions running on another thread. I can't use sleep to increment the mseconds... 
 // timer thread could use poll... but I'd have to setup some kinda of shared buffer as a fd for it poll... 
 // timer thread could use a mutex timeout thingy
+// Use SIGPOLL? 
+
+
+// Have 2 threads. The main thread implements the keyhit fetching. 
+// Timer thread sleeps, wakes up and checks if any keys are hit 
+// -> response time is essentially the same. Is there a way to respond to keys without affecting time progression 
+
+// Essentially, want to replace active polling with async signal handling
+
 
 int kbhit(void) {
     static bool initflag = false;
@@ -48,8 +58,8 @@ static char args_doc[] = "stopwatch timer";
 static struct argp_option options[] = {
 	{"stopwatch", 's', 0, 0, "Starts a stopwatch."},	
 	{"timer", 't', "XhYmZs", 0, 
-		"Starts a timer. Time components (Xh, Ym, Zs) can be of any combination,  \
-but must be in order. \
+		"Starts a timer. Time components (Xh, Ym, Zs) can be of any combination, \
+but must be in order. X,Y,Z can be any integer above 0. \
 Eg. 2m30s=2minutes 30seconds, 1h20m=1hour 20minutes, 10s=10seconds."}, 
 	{0},	
 
@@ -78,10 +88,8 @@ int timer(int seconds){
 	int runningFlag = 1;
 	while(1){
 		usleep(1e3);
-		char commandStr;
 		if (kbhit()){
-			commandStr = getchar();
-			switch(commandStr){
+			switch(getchar()){
 				case ' ': 
 					// toggle runningFlag
 					runningFlag = (runningFlag+1) % 2;
@@ -97,7 +105,7 @@ int timer(int seconds){
 			}	
 		}		
 		time_printout(mseconds, runningFlag);
-		if (mseconds > 0 && runningFlag == 1) mseconds--;
+		if (mseconds > 0 && runningFlag) mseconds--;
 	}
 	return 1; 
 }
@@ -108,10 +116,8 @@ int stopwatch(){
 	while (1){
 		// poll every 1msec
 		usleep(1e3);
-		char commandStr; 
 		if (kbhit()){
-			commandStr = getchar();
-			switch(commandStr){
+			switch(getchar()){
 				case ' ': 
 					runningFlag = (runningFlag+1) % 2;
 					break;
@@ -126,7 +132,7 @@ int stopwatch(){
 			}	
 		}		
 		time_printout(mseconds, runningFlag);
-		if (runningFlag == 1) mseconds++;
+		if (runningFlag) mseconds++;
 	}	 
 	return 1;
 }
@@ -134,11 +140,9 @@ int stopwatch(){
 int parse_time(char* arg){
 	// string should be in format XhYmZs
 	// Any combination of Xh, Ym, Zs, in that order
-	
 
-	// char* string_check = (char*)malloc(strlen(arg)+1);
 	char string_check[strlen(arg)+1];
-	strncpy(string_check,arg, strlen(arg)+1);
+	strncpy(string_check, arg, strlen(arg)+1);
 
 	const char chunks[] = {'h','m','s'};
 	int nums[3] = {0,0,0}; 
@@ -148,7 +152,7 @@ int parse_time(char* arg){
 		char* pos = strchr(string_check, chunks[i]); 
 		if (pos != NULL){
 			int time_num = atoi(strtok(foundTokens <= 0 ? arg:NULL, "hms")); 
-			if (time_num < 0){
+			if (time_num <= 0){
 				printf("Invalid time value for %c\n", chunks[i]);
 				exit(1);
 			} else { 
@@ -174,7 +178,12 @@ parse_opt (int key, char *arg, struct argp_state *state)
 	  int seconds =	parse_time(arg); 
 	  timer(seconds);
       break;
-    }
+    case ARGP_KEY_END:
+	  // At least one argument expected.
+	  if(state->arg_num < 1)
+		argp_usage(state);
+	  break;
+	}
   return 0;
 }
 
