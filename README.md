@@ -6,8 +6,8 @@ Runs in the terminal. (Space) to Start/Stop, (E) to Exit and (R) to Reset.
 ### Linux (tested on Ubuntu 20.04)
 1. Clone repository 
 2. Enter repo directory and `make`.
-### OSX (tested on x86)
-We need to ensure that the argp header file and linker is available to the compiler, as OSX does not come with it by default.
+### macOS (tested on x86)
+We need to ensure that the argp header file and linker is available to the compiler, as macOS does not come with it by default.
 1. Install the argp library with `brew install argp-standalone`. 
 2. If not already done, add the following lines to `~/.bash_profile`: 
   ```bash 
