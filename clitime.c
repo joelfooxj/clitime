@@ -7,24 +7,24 @@
 #include<termios.h>
 #include<sys/ioctl.h>
 #include<stdbool.h>
-
+#include<pthread.h>
+#include<errno.h>
+#include<poll.h>
 
 // TODO: Improve time parser for out-of-order components
 // TODO: Improve error checking for time parser
 // TODO: Improve arg parser error checking
-// TODO: Should probably assign timer/UI to a separate thread.
-// -> Put the time functions running on another thread. I can't use sleep to increment the mseconds... 
-// timer thread could use poll... but I'd have to setup some kinda of shared buffer as a fd for it poll... 
-// timer thread could use a mutex timeout thingy
-// Use SIGPOLL? 
+// TODO: BUG -> sometimes r and e stop working
+#define DO_NOTHING 2; 
 
+pthread_mutex_t run_lock = PTHREAD_MUTEX_INITIALIZER; 
+pthread_cond_t run_cond; 
+int command_mtx = DO_NOTHING;
 
-// Have 2 threads. The main thread implements the keyhit fetching. 
-// Timer thread sleeps, wakes up and checks if any keys are hit 
-// -> response time is essentially the same. Is there a way to respond to keys without affecting time progression 
-
-// Essentially, want to replace active polling with async signal handling
-
+typedef struct time_args { 
+	int isIncrement; 
+	int seconds;
+} time_args;
 
 int kbhit(void) {
     static bool initflag = false;
@@ -82,59 +82,52 @@ void time_printout(int mseconds, int status){
 	}
 }
 
-int timer(int seconds){
-	int original_mseconds = 1000*seconds;
-	int mseconds = 1000*seconds;
-	int runningFlag = 1;
+// command_mtx: 
+// 1/0 toggle 
+// -1 exit 
+// -2 reset
+void* time_counter(void* args){
+	int original_mseconds = ((time_args*)args)->isIncrement ? 0:1000*((time_args*)args)->isIncrement;
+	int mseconds = 1000*((time_args*)args)->seconds; 
+	int running = 1;
 	while(1){
 		usleep(1e3);
-		if (kbhit()){
-			switch(getchar()){
-				case ' ': 
-					// toggle runningFlag
-					runningFlag = (runningFlag+1) % 2;
-					break;
-				case 'e': 
-					exit(0);
-				case 'r': 
-					mseconds = original_mseconds;
-					break; 
-				default: 
-					// Invalid commands are ignored.
-					break;
-			}	
-		}		
-		time_printout(mseconds, runningFlag);
-		if (mseconds > 0 && runningFlag) mseconds--;
+		pthread_mutex_lock(&run_lock); 
+		
+		if (!running){ 
+			time_printout(mseconds, running);
+			pthread_cond_wait(&run_cond, &run_lock);
+		} else { 
+			if (((time_args*)args)->isIncrement) mseconds++;
+			else mseconds--;
+			time_printout(mseconds, running);
+		}
+		
+		if (mseconds <= 0) running = 0;
+	
+		switch(command_mtx){
+			case 1: 
+				// toggle
+				running = (running+1)%2; 
+				break;
+			case 0: 
+				// exit
+				pthread_mutex_unlock(&run_lock);
+				return (void*)0;
+				break;
+			case -1: 
+				mseconds = original_mseconds;
+				time_printout(mseconds, running);
+				break; 
+			default: 
+				// Invalid commands are ignored.
+				// printf("Invalid command:%d\n", command_mtx); 
+				break;
+		}	
+		command_mtx = DO_NOTHING;
+		pthread_mutex_unlock(&run_lock);
 	}
-	return 1; 
-}
-
-int stopwatch(){
-	int mseconds = 0;
-	int runningFlag = 1; 	
-	while (1){
-		// poll every 1msec
-		usleep(1e3);
-		if (kbhit()){
-			switch(getchar()){
-				case ' ': 
-					runningFlag = (runningFlag+1) % 2;
-					break;
-				case 'e': 
-					exit(0);
-				case 'r': 
-					mseconds = 0;
-					break; 
-				default: 
-					// Invalid commands are ignored.
-					break;
-			}	
-		}		
-		time_printout(mseconds, runningFlag);
-		if (runningFlag) mseconds++;
-	}	 
-	return 1;
+	return (void*)1; 
 }
 
 int parse_time(char* arg){
@@ -164,27 +157,80 @@ int parse_time(char* arg){
 	return (nums[0]*3600)+(nums[1]*60)+(nums[2]);
 }
 
+int UI_loop(){
+	// Changes the shared var command_mtx
+	int running = 1;
+	struct pollfd fds[1]; 
+	fds[0].fd = STDIN_FILENO;  
+	fds[0].events = POLLIN;
+	while(running){
+		int ret = poll(fds, 1, -1); 	
+		if (kbhit()){
+			pthread_mutex_lock(&run_lock);
+			switch(getchar()){
+				case ' ': 
+					// signal regardless? 
+					// command_mtx = (command_mtx+1) % 2;
+					command_mtx = 1; 
+					break;
+				case 'e': 
+					command_mtx = 0;
+					running = 0;
+					break;
+				case 'r': 
+					command_mtx = -1; 
+					break; 
+				default: 
+					// Invalid commands are ignored.
+					break;
+			}
+			pthread_mutex_unlock(&run_lock);	
+			pthread_cond_signal(&run_cond);
+		}
+	}
+	return 0;
+}
+
+int init_timer_thread(int isIncrement, int seconds){
+	time_args* t_args = (time_args*)malloc(sizeof(time_args));
+	t_args->isIncrement = isIncrement; 
+	t_args->seconds = seconds; 
+    if (pthread_mutex_init(&run_lock, NULL) != 0){
+		printf("[ERROR]: Init mutex failed.\n");
+		exit(1);
+	}
+	pthread_t timer;
+	int error = pthread_create(&timer, NULL, time_counter, (void*)t_args);
+	if (error != 0){
+		printf("Timer thread cannot be created: [%s]\n", strerror(error));
+		exit(1);
+	} 
+	UI_loop();
+	pthread_join(timer, NULL); 
+	free(t_args);
+	return 0;
+}
+
 static error_t
 parse_opt (int key, char *arg, struct argp_state *state)
 {
-  switch (key)
-    {
-    case 's':
-      printf("stopwatch started...\n");
-	  stopwatch(); 
-      break;
-    case 't':
-      printf("timer started...\n");
-	  int seconds =	parse_time(arg); 
-	  timer(seconds);
-      break;
-    case ARGP_KEY_END:
-	  // At least one argument expected.
-	  if(state->arg_num < 1)
-		argp_usage(state);
-	  break;
-	}
-  return 0;
+    switch (key){
+        case 's':
+            printf("stopwatch started...\n");
+		    init_timer_thread(1, 0);  
+            // break;
+			return 0; 
+        case 't':
+            printf("timer started...\n");
+			init_timer_thread(0, parse_time(arg));
+            break;
+        case ARGP_KEY_END:
+            // At least one argument expected.
+            if(state->arg_num < 1)
+              argp_usage(state);
+            break;
+    }
+ return 0;
 }
 
 static struct argp argp = {options, parse_opt, args_doc, doc};
