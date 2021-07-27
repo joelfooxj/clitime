@@ -7,7 +7,7 @@
 #include<termios.h>
 #include<sys/ioctl.h>
 #include<stdbool.h>
-
+#include<poll.h>
 
 // TODO: Improve time parser for out-of-order components
 // TODO: Improve error checking for time parser
@@ -82,12 +82,21 @@ void time_printout(int mseconds, int status){
 	}
 }
 
-int timer(int seconds){
-	int original_mseconds = 1000*seconds;
-	int mseconds = 1000*seconds;
+int time_counter(int isIncrement, int seconds){
+	int original_mseconds = (isIncrement) ? 0 : 1000*seconds;
+	int mseconds = original_mseconds;
 	int runningFlag = 1;
+	int pollRet = 0;
+	struct pollfd fds[1]; 
+	fds[0].fd = STDIN_FILENO;
+	fds[0].events = POLLIN; 
 	while(1){
 		usleep(1e3);
+		time_printout(mseconds, runningFlag);
+		if (!runningFlag){
+			// this should suspend the process... 
+			pollRet = poll(fds, 1, -1);
+		}
 		if (kbhit()){
 			switch(getchar()){
 				case ' ': 
@@ -104,37 +113,13 @@ int timer(int seconds){
 					break;
 			}	
 		}		
-		time_printout(mseconds, runningFlag);
-		if (mseconds > 0 && runningFlag) mseconds--;
+		if (runningFlag){
+			if (isIncrement) mseconds++; 
+			else mseconds --;
+		}
+		if (mseconds <= 0) runningFlag = 0;
 	}
 	return 1; 
-}
-
-int stopwatch(){
-	int mseconds = 0;
-	int runningFlag = 1; 	
-	while (1){
-		// poll every 1msec
-		usleep(1e3);
-		if (kbhit()){
-			switch(getchar()){
-				case ' ': 
-					runningFlag = (runningFlag+1) % 2;
-					break;
-				case 'e': 
-					exit(0);
-				case 'r': 
-					mseconds = 0;
-					break; 
-				default: 
-					// Invalid commands are ignored.
-					break;
-			}	
-		}		
-		time_printout(mseconds, runningFlag);
-		if (runningFlag) mseconds++;
-	}	 
-	return 1;
 }
 
 int parse_time(char* arg){
@@ -171,12 +156,11 @@ parse_opt (int key, char *arg, struct argp_state *state)
     {
     case 's':
       printf("stopwatch started...\n");
-	  stopwatch(); 
+	  time_counter(1,0); 
       break;
     case 't':
       printf("timer started...\n");
-	  int seconds =	parse_time(arg); 
-	  timer(seconds);
+	  time_counter(0,parse_time(arg));
       break;
     case ARGP_KEY_END:
 	  // At least one argument expected.
