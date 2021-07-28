@@ -88,7 +88,6 @@ int time_counter(int isIncrement, int seconds){
 		usleep(micro_multiplier);
 		time_printout(mseconds, runningFlag);
 		if (!runningFlag){
-			// this should suspend the process... 
 			pollRet = poll(fds, 1, -1);
 		}
 		if (kbhit()){
@@ -96,6 +95,7 @@ int time_counter(int isIncrement, int seconds){
 				case ' ': 
 					// toggle runningFlag
 					runningFlag = (runningFlag+1) % 2;
+					time_printout(mseconds, runningFlag);
 					break;
 				case 'e': 
 					exit(0);
