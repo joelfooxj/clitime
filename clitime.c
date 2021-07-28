@@ -12,19 +12,12 @@
 // TODO: Improve time parser for out-of-order components
 // TODO: Improve error checking for time parser
 // TODO: Improve arg parser error checking
-// TODO: Should probably assign timer/UI to a separate thread.
-// -> Put the time functions running on another thread. I can't use sleep to increment the mseconds... 
-// timer thread could use poll... but I'd have to setup some kinda of shared buffer as a fd for it poll... 
-// timer thread could use a mutex timeout thingy
-// Use SIGPOLL? 
+// TODO: Add the following second resolutions: 
+// 1. centiseconds
+// 2. milliseconds
+// 3. microseconds
 
-
-// Have 2 threads. The main thread implements the keyhit fetching. 
-// Timer thread sleeps, wakes up and checks if any keys are hit 
-// -> response time is essentially the same. Is there a way to respond to keys without affecting time progression 
-
-// Essentially, want to replace active polling with async signal handling
-
+int micro_multiplier = 1e3*100;
 
 int kbhit(void) {
     static bool initflag = false;
@@ -68,12 +61,13 @@ Eg. 2m30s=2minutes 30seconds, 1h20m=1hour 20minutes, 10s=10seconds."},
 const char* commands_desc = "Start/Stop(space), Reset(r), Exit(e)\n";
 
 void time_printout(int mseconds, int status){ 
+	int second_multiplier = 1e6/micro_multiplier;
 	printf("\033c");
-	printf("%dhr %dmin %dsec %dmsec\n", 
-		(mseconds/1000)/3600, 
-		(mseconds/60000)%60, 
-		(mseconds/1000)%60, 
-		mseconds%1000); 
+	printf("%dhr %dmin %d.%dsec\n", 
+		(mseconds/second_multiplier)/3600, 
+		(mseconds/(60*second_multiplier))%60, 
+		(mseconds/second_multiplier)%60, 
+		mseconds%second_multiplier); 
 	printf("%s",commands_desc); 
 	if (status == 1){
 		printf("Running.\n");  
@@ -83,7 +77,7 @@ void time_printout(int mseconds, int status){
 }
 
 int time_counter(int isIncrement, int seconds){
-	int original_mseconds = (isIncrement) ? 0 : 1000*seconds;
+	int original_mseconds = (isIncrement) ? 0 : (1e6/micro_multiplier)*seconds;
 	int mseconds = original_mseconds;
 	int runningFlag = 1;
 	int pollRet = 0;
@@ -91,7 +85,7 @@ int time_counter(int isIncrement, int seconds){
 	fds[0].fd = STDIN_FILENO;
 	fds[0].events = POLLIN; 
 	while(1){
-		usleep(1e3);
+		usleep(micro_multiplier);
 		time_printout(mseconds, runningFlag);
 		if (!runningFlag){
 			// this should suspend the process... 
