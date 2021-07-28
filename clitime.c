@@ -95,7 +95,6 @@ int time_counter(int isIncrement, int seconds){
 				case ' ': 
 					// toggle runningFlag
 					runningFlag = (runningFlag+1) % 2;
-					time_printout(mseconds, runningFlag);
 					break;
 				case 'e': 
 					exit(0);
@@ -106,6 +105,7 @@ int time_counter(int isIncrement, int seconds){
 					// Invalid commands are ignored.
 					break;
 			}	
+			time_printout(mseconds, runningFlag);
 		}		
 		if (runningFlag){
 			if (isIncrement) mseconds++; 
