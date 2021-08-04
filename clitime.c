@@ -49,6 +49,7 @@ static char doc[] =
 static char args_doc[] = "stopwatch timer"; 
 
 static struct argp_option options[] = {
+	{"resolution", 'r', "u/m/c/s", 0, "Sets the resolution. u(microsecond), m(millisecond), c(centisecond), s(second)."},	
 	{"stopwatch", 's', 0, 0, "Starts a stopwatch."},	
 	{"timer", 't', "XhYmZs", 0, 
 		"Starts a timer. Time components (Xh, Ym, Zs) can be of any combination, \
@@ -143,11 +144,42 @@ int parse_time(char* arg){
 	return (nums[0]*3600)+(nums[1]*60)+(nums[2]);
 }
 
+int set_resolution(char* arg){ 
+	 
+	if (strlen(arg) != 1){ 
+		printf("Resolution argument length too long.");   
+		return -1; 
+	}
+	
+	char resolution = arg[0]; 
+	switch(resolution){
+		case 'u':
+			micro_multiplier = 1;
+			break;
+		case 'm':
+			micro_multiplier = 1e3;
+			break;
+		case 's':
+			micro_multiplier = 1e6;
+			break;
+		case 'c':
+			micro_multiplier = 1e3*100;
+			break;
+		default: 
+			printf("Invalid resolution entered.");   
+	}	
+	return 0;
+}
+
+
 static error_t
 parse_opt (int key, char *arg, struct argp_state *state)
 {
   switch (key)
     {
+    case 'r':
+	  set_resolution(arg); 	
+      break;
     case 's':
       printf("stopwatch started...\n");
 	  time_counter(1,0); 
@@ -170,7 +202,5 @@ static struct argp argp = {options, parse_opt, args_doc, doc};
 int main(int argc, char* argv[]){ 
 	argp_parse(&argp, argc, argv, 0, 0, 0);
 	exit(0);	
-
-	
 }
 
