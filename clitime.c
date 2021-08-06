@@ -12,10 +12,17 @@
 // TODO: Improve time parser for out-of-order components
 // TODO: Improve error checking for time parser
 // TODO: Improve arg parser error checking
-// TODO: Add the following second resolutions: 
-// 1. centiseconds
-// 2. milliseconds
-// 3. microseconds
+// TODO: Major bug -> there's lag from post processing
+
+// Need to redesign this to use either multi-threading or to use 
+// the processor clock
+
+// -> Stopwatch: simply mark the start time and then print the current offset from that time 
+
+// -> Timer: Mark the start time and subtract current offset from time period
+
+// -> Pause: set start time to now, and offset to 0
+
 
 int micro_multiplier = 1e3*100;
 
@@ -61,10 +68,10 @@ Eg. 2m30s=2minutes 30seconds, 1h20m=1hour 20minutes, 10s=10seconds."},
 
 const char* commands_desc = "Start/Stop(space), Reset(r), Exit(e)\n";
 
-void time_printout(int mseconds, int status){ 
-	int second_multiplier = 1e6/micro_multiplier;
+void time_printout(unsigned long mseconds, int status){ 
+	unsigned long second_multiplier = 1e6/micro_multiplier;
 	printf("\033c");
-	printf("%dhr %dmin %d.%dsec\n", 
+	printf("%luhr %lumin %lu.%lusec\n", 
 		(mseconds/second_multiplier)/3600, 
 		(mseconds/(60*second_multiplier))%60, 
 		(mseconds/second_multiplier)%60, 
@@ -78,8 +85,8 @@ void time_printout(int mseconds, int status){
 }
 
 int time_counter(int isIncrement, int seconds){
-	int original_mseconds = (isIncrement) ? 0 : (1e6/micro_multiplier)*seconds;
-	int mseconds = original_mseconds;
+	unsigned long original_mseconds = (isIncrement) ? 0 : (1e6/micro_multiplier)*seconds;
+	unsigned long mseconds = original_mseconds;
 	int runningFlag = 1;
 	int pollRet = 0;
 	struct pollfd fds[1]; 
@@ -148,7 +155,7 @@ int set_resolution(char* arg){
 	 
 	if (strlen(arg) != 1){ 
 		printf("Resolution argument length too long.");   
-		return -1; 
+		exit(1);
 	}
 	
 	char resolution = arg[0]; 
@@ -166,11 +173,18 @@ int set_resolution(char* arg){
 			micro_multiplier = 1e3*100;
 			break;
 		default: 
-			printf("Invalid resolution entered.");   
+			printf("Invalid resolution entered.\n");   
+			exit(1);
 	}	
 	return 0;
 }
 
+typedef struct time_arg{
+	int isIncrement; 
+	int seconds;
+} time_arg;
+
+time_arg t_args; 
 
 static error_t
 parse_opt (int key, char *arg, struct argp_state *state)
@@ -178,21 +192,33 @@ parse_opt (int key, char *arg, struct argp_state *state)
   switch (key)
     {
     case 'r':
-	  set_resolution(arg); 	
-      break;
+	   set_resolution(arg); 	
+       break;
     case 's':
-      printf("stopwatch started...\n");
-	  time_counter(1,0); 
+	  t_args.isIncrement = 1; 
+	  t_args.seconds = 0;
       break;
     case 't':
-      printf("timer started...\n");
-	  time_counter(0,parse_time(arg));
+	  t_args.isIncrement = 0; 
+	  t_args.seconds = parse_time(arg);
       break;
     case ARGP_KEY_END:
 	  // At least one argument expected.
 	  if(state->arg_num < 1)
-		argp_usage(state);
+	  	argp_usage(state);
+		
+		printf("Got here\n");
 	  break;
+	case ARGP_KEY_ERROR: 
+		printf("Error parsing\n");
+		break;
+	case ARGP_KEY_FINI: 
+		printf("finished parsing\n");
+		break;
+	
+	case ARGP_KEY_SUCCESS: 
+		time_counter(t_args.isIncrement, t_args.seconds);
+		break;
 	}
   return 0;
 }
@@ -200,7 +226,7 @@ parse_opt (int key, char *arg, struct argp_state *state)
 static struct argp argp = {options, parse_opt, args_doc, doc};
 
 int main(int argc, char* argv[]){ 
-	argp_parse(&argp, argc, argv, 0, 0, 0);
-	exit(0);	
+	// Seems like nothing happens after argp_parse... 
+	return argp_parse(&argp, argc, argv, 0, 0, 0);
 }
 
