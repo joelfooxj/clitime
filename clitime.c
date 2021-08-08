@@ -132,6 +132,7 @@ int parse_time(char* arg){
 	strncpy(string_check, arg, strlen(arg)+1);
 
 	const char chunks[] = {'h','m','s'};
+	const char* chunkReps[] = {"hours", "minutes", "seconds"};
 	int nums[3] = {0,0,0}; 
 
 	int foundTokens = 0;
@@ -140,7 +141,7 @@ int parse_time(char* arg){
 		if (pos != NULL){
 			int time_num = atoi(strtok(foundTokens <= 0 ? arg:NULL, "hms")); 
 			if (time_num <= 0){
-				printf("Invalid time value for %c\n", chunks[i]);
+				printf("Invalid time value for %s\n", chunkReps[i]);
 				exit(1);
 			} else { 
 				nums[i] = time_num;
@@ -186,6 +187,8 @@ typedef struct time_arg{
 
 time_arg t_args; 
 
+int number_selected = 0;
+
 static error_t
 parse_opt (int key, char *arg, struct argp_state *state)
 {
@@ -195,20 +198,17 @@ parse_opt (int key, char *arg, struct argp_state *state)
 	   set_resolution(arg); 	
        break;
     case 's':
+		number_selected++;
 	  t_args.isIncrement = 1; 
 	  t_args.seconds = 0;
       break;
     case 't':
+		number_selected++;
 	  t_args.isIncrement = 0; 
 	  t_args.seconds = parse_time(arg);
       break;
     case ARGP_KEY_END:
-	  // At least one argument expected.
-	  if(state->arg_num < 1)
-	  	argp_usage(state);
-		
-		printf("Got here\n");
-	  break;
+	    break;
 	case ARGP_KEY_ERROR: 
 		printf("Error parsing\n");
 		break;
@@ -217,6 +217,11 @@ parse_opt (int key, char *arg, struct argp_state *state)
 		break;
 	
 	case ARGP_KEY_SUCCESS: 
+		// 1. Check if only either t or s has been selected 
+		if (number_selected != 1){
+			printf("Please select either timer or stopwatch functionality\n"); 
+			exit(1);
+		}
 		time_counter(t_args.isIncrement, t_args.seconds);
 		break;
 	}
@@ -226,7 +231,6 @@ parse_opt (int key, char *arg, struct argp_state *state)
 static struct argp argp = {options, parse_opt, args_doc, doc};
 
 int main(int argc, char* argv[]){ 
-	// Seems like nothing happens after argp_parse... 
 	return argp_parse(&argp, argc, argv, 0, 0, 0);
 }
 
